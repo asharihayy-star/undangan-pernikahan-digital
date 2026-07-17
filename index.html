@@ -746,10 +746,45 @@ function generateLink() {
     </div>
     ${big ? `<p class="warn">⚠️ Tautan cukup panjang (kemungkinan karena foto yang diunggah). Jika susah dibagikan lewat WhatsApp/SMS, ganti foto dengan link (URL) dari Google Drive/Imgur, atau kurangi jumlah foto.</p>`
           : `<p class="hint">Tautan siap dibagikan. Membukanya akan langsung menampilkan undangan ini.</p>`}
+    <button type="button" class="dashedbtn" id="shortenBtn" style="margin-top:8px;">🔗 Persingkat Tautan</button>
+    <div id="shortenOut"></div>
   `;
   document.getElementById("copyLinkBtn").addEventListener("click", async ()=>{
     try { await navigator.clipboard.writeText(url); document.getElementById("copyLinkBtn").textContent = "Tersalin ✓"; setTimeout(()=>{ document.getElementById("copyLinkBtn").textContent="Salin"; },1800); } catch {}
   });
+  document.getElementById("shortenBtn").addEventListener("click", ()=> shortenLink(url));
+}
+
+async function shortenLink(longUrl) {
+  const box = document.getElementById("shortenOut");
+  const btn = document.getElementById("shortenBtn");
+  btn.textContent = "Memproses...";
+  btn.disabled = true;
+  try {
+    const res = await fetch("https://cleanuri.com/api/v1/shorten", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "url=" + encodeURIComponent(longUrl),
+    });
+    if (!res.ok) throw new Error("failed");
+    const data = await res.json();
+    if (!data.result_url) throw new Error("no result");
+    box.innerHTML = `
+      <div class="linkbox">
+        <input class="inp" id="shortField" readonly value="${data.result_url}">
+        <button type="button" class="uploadbtn" id="copyShortBtn">Salin</button>
+      </div>
+      <p class="hint">Tautan pendek ini otomatis mengarah ke tautan panjang di atas.</p>
+    `;
+    document.getElementById("copyShortBtn").addEventListener("click", async ()=>{
+      try { await navigator.clipboard.writeText(data.result_url); document.getElementById("copyShortBtn").textContent = "Tersalin ✓"; setTimeout(()=>{ document.getElementById("copyShortBtn").textContent="Salin"; },1800); } catch {}
+    });
+  } catch (e) {
+    box.innerHTML = `<p class="warn">⚠️ Gagal mempersingkat otomatis (bisa jadi diblokir jaringan/provider HP). Cara manual: buka <a href="https://tinyurl.com" target="_blank" style="text-decoration:underline;">tinyurl.com</a> atau <a href="https://s.id" target="_blank" style="text-decoration:underline;">s.id</a>, tempel tautan panjang di atas ke situ, lalu salin hasilnya.</p>`;
+  } finally {
+    btn.textContent = "🔗 Persingkat Tautan";
+    btn.disabled = false;
+  }
 }
 
 /* ============================================================
