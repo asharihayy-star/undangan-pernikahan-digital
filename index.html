@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Undangan Pernikahan Digital</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500;600&display=swap');
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:'Jost',sans-serif; background:#EEEBE3; color:#2A2622; }
+  .font-display { font-family:'Cormorant Garamond',serif; }
+  .font-script { font-family:'Alex Brush',cursive; }
+  a { color:inherit; }
+  /* ---- top bar ---- */
+  #topbar { position:sticky; top:0; z-index:40; background:rgba(238,235,227,.95); backdrop-filter:blur(6px);
+    border-bottom:1px solid #d6d2c7; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; }
+  #topbar .brand { display:flex; align-items:center; gap:8px; font-family:'Cormorant Garamond',serif; font-size:19px; }
+  .tabbtn { border:1px solid #d6d2c7; background:#fff; border-radius:999px; padding:2px; display:flex; }
+  .tabbtn button { border:none; background:none; padding:6px 12px; border-radius:999px; font-size:12px; font-weight:500; cursor:pointer; color:#57534b; }
+  .tabbtn button.active { background:#2A2622; color:#fff; }
+  /* ---- layout ---- */
+  #layout { max-width:1100px; margin:0 auto; display:flex; align-items:flex-start; }
+  #editorPane { width:420px; flex-shrink:0; border-right:1px solid #d6d2c7; height:calc(100vh - 57px); position:sticky; top:57px; overflow-y:auto; padding:16px; }
+  #previewPane { flex:1; padding:28px 12px; }
+  @media (max-width: 900px) {
+    #editorPane, #previewPane { width:100%; display:none; }
+    #editorPane.show, #previewPane.show { display:block; }
+    #editorPane { height:auto; position:static; }
+  }
+  /* ---- form ---- */
+  .field { display:block; margin-bottom:12px; }
+  .field .lbl { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#78716c; margin-bottom:4px; }
+  .inp, select.inp, textarea.inp { width:100%; border:1px solid #d6d3ce; border-radius:6px; padding:8px 10px; font-size:13px; font-family:inherit; color:#292524; background:#fff; }
+  textarea.inp { min-height:64px; resize:vertical; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .section { border-bottom:1px solid #e7e5e0; padding:10px 0; }
+  .section > .head { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:6px 0; font-size:13px; font-weight:500; }
+  .section > .body { display:none; padding-top:4px; }
+  .section.open > .body { display:block; }
+  .chev { transition:transform .15s; color:#a8a29e; }
+  .section.open .chev { transform:rotate(180deg); }
+  .listitem { background:#fafaf9; border:1px solid #e7e5e0; border-radius:8px; padding:10px; margin-bottom:10px; position:relative; }
+  .listitem .rm { position:absolute; top:8px; right:8px; border:none; background:none; cursor:pointer; color:#a8a29e; font-size:14px; }
+  .listitem .rm:hover { color:#dc2626; }
+  .dashedbtn { width:100%; border:1px dashed #a8a29e; background:none; border-radius:6px; padding:9px; font-size:12px; font-weight:500; cursor:pointer; color:#44403c; }
+  .dashedbtn:hover { background:#f5f5f4; }
+  .themegrid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .themecard { border:1px solid #d6d3ce; border-radius:8px; padding:8px; cursor:pointer; text-align:left; background:#fff; }
+  .themecard.active { border-color:#2A2622; box-shadow:0 0 0 1px #2A2622; }
+  .swatches { display:flex; gap:4px; margin-bottom:4px; }
+  .swatch { width:14px; height:14px; border-radius:999px; }
+  .uploadrow { display:flex; gap:6px; }
+  .uploadbtn { flex-shrink:0; border:1px solid #d6d3ce; background:#fff; border-radius:6px; padding:8px 10px; font-size:11px; font-weight:500; cursor:pointer; }
+  .thumb { margin-top:6px; width:56px; height:56px; object-fit:cover; border-radius:6px; border:1px solid #e7e5e0; }
+  .savestat { font-size:11px; color:#a8a29e; height:14px; margin-bottom:6px; }
+  .checkline { display:flex; align-items:center; gap:8px; font-size:12px; color:#57534b; margin-top:8px; }
+  .linkbox { display:flex; gap:6px; margin-top:8px; }
+  .linkbox input { flex:1; }
+  .primarybtn { border:none; background:#2A2622; color:#fff; border-radius:999px; padding:10px 14px; font-size:13px; font-weight:500; cursor:pointer; width:100%; }
+  .warn { font-size:11px; color:#b45309; margin-top:6px; }
+  .hint { font-size:11px; color:#a8a29e; margin-top:6px; }
+  /* ---- phone frame (editor preview) ---- */
+  #phoneWrap { width:380px; height:720px; margin:0 auto; border-radius:2.2rem; border:8px solid #292524; box-shadow:0 20px 40px rgba(0,0,0,.25); overflow:hidden; position:relative; background:#FBF7EF; }
+  #phoneScroll { width:100%; height:100%; overflow-y:auto; }
+  #previewCaption { text-align:center; font-size:11px; color:#78716c; margin-top:10px; }
+  /* ---- guest full view ---- */
+  #guestWrap { max-width:480px; margin:0 auto; min-height:100vh; background:#FBF7EF; position:relative; box-shadow:0 0 40px rgba(0,0,0,.12); }
+  #guestScroll { position:relative; }
+  /* ---- invitation content (shared) ---- */
+  .inv-cover { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px 32px; text-align:center; position:relative; }
+  .phone .inv-cover { min-height:720px; }
+  .inv-eyebrow { font-size:11px; letter-spacing:.3em; text-transform:uppercase; opacity:.85; margin-bottom:22px; }
+  .inv-names-script { font-family:'Alex Brush',cursive; font-size:40px; margin:14px 0 0; line-height:1.1; }
+  .inv-openbtn { margin-top:38px; display:inline-flex; align-items:center; gap:8px; border:none; border-radius:999px; padding:11px 24px; font-size:13px; font-weight:500; cursor:pointer; }
+  .inv-sec { padding:44px 30px; text-align:center; }
+  .inv-h2 { font-family:'Cormorant Garamond',serif; font-size:26px; margin:0 0 6px; }
+  .flourish { width:150px; height:22px; margin:0 auto 10px; display:block; }
+  .couple-photo { width:96px; height:96px; border-radius:999px; object-fit:cover; margin:0 auto 10px; border:2px solid; display:block; }
+  .couple-photo-ph { width:96px; height:96px; border-radius:999px; margin:0 auto 10px; border:2px solid; display:flex; align-items:center; justify-content:center; }
+  .story-item { border-left:2px solid; padding-left:14px; text-align:left; margin-bottom:18px; }
+  .cd-wrap { display:flex; justify-content:center; gap:10px; margin:22px 0; }
+  .cd-box { width:54px; border-radius:10px; padding:8px 0; color:#fff; }
+  .cd-num { font-family:'Cormorant Garamond',serif; font-size:19px; line-height:1; }
+  .cd-lbl { font-size:9px; text-transform:uppercase; letter-spacing:.05em; opacity:.8; margin-top:4px; }
+  .ev-block { margin-bottom:18px; text-align:center; }
+  .maps-btn, .wa-btn { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:9px 16px; font-size:12px; font-weight:500; text-decoration:none; margin-top:6px; }
+  .gallery-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+  .gallery-grid img { width:100%; height:110px; object-fit:cover; border-radius:6px; }
+  .acc-card { border:1px solid; border-radius:10px; padding:12px; display:flex; align-items:center; justify-content:space-between; text-align:left; margin-bottom:10px; }
+  .copybtn { border:none; border-radius:999px; padding:8px; cursor:pointer; }
+  .wish-form input, .wish-form select, .wish-form textarea { width:100%; border-radius:6px; border:1px solid; padding:8px 10px; font-size:12px; margin-bottom:6px; font-family:inherit; }
+  .wish-card { border-radius:8px; padding:10px; text-align:left; margin-bottom:8px; }
+  .footer-sec { text-align:center; }
+  /* ---- petals ---- */
+  .petal-layer { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:30; }
+  .petal { position:absolute; top:-24px; animation-name:petalFall; animation-timing-function:linear; animation-iteration-count:infinite; }
+  @keyframes petalFall {
+    0% { transform:translateY(-20px) translateX(0) rotate(0deg); opacity:0; }
+    12% { opacity:.8; } 88% { opacity:.7; }
+    100% { transform:translateY(760px) translateX(var(--drift)) rotate(var(--spin)); opacity:0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="brand">💍 Undangan Digital</div>
+  <div class="tabbtn" id="tabSwitch">
+    <button id="tabEditor" class="active" onclick="switchTab('editor')">✏️ Edit</button>
+    <button id="tabPreview" onclick="switchTab('preview')">👁 Pratinjau</button>
+  </div>
+</div>
+
+<div id="layout">
+  <div id="editorPane" class="show"></div>
+  <div id="previewPane" class="show">
+    <div id="phoneWrap" class="phone">
+      <div id="phoneScroll"></div>
+    </div>
+    <p id="previewCaption">Pratinjau tampilan di layar tamu</p>
+  </div>
+</div>
+
+<div id="guestRoot" style="display:none;"></div>
+
+<script>
+/* ============================================================
+   DATA
+============================================================ */
+const uid = () => Math.random().toString(36).slice(2,9);
+
+const THEMES = {
+  emerald: { label:"Kebun Zamrud", bg:"#FBF7EF", surface:"#FFFDF8", ink:"#2A2622", inkSoft:"#5B564C", primary:"#2F4A3C", accent:"#B8935F", line:"#DCD3BE" },
+  blush:   { label:"Merah Muda Senja", bg:"#FBF2F0", surface:"#FFFFFF", ink:"#362225", inkSoft:"#6B4E52", primary:"#8C4A54", accent:"#C9A15A", line:"#E9D3CE" },
+  mono:    { label:"Monokrom Klasik", bg:"#F5F4F0", surface:"#FFFFFF", ink:"#201E1B", inkSoft:"#5A564E", primary:"#24211D", accent:"#9C8B6E", line:"#DEDAD0" },
+};
+
+function defaultData() {
+  return {
+    theme: "emerald",
+    guestName: "Bapak/Ibu/Saudara/i",
+    quote: "Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu pasangan hidup agar kamu merasa tenteram kepadanya. — QS. Ar-Rum: 21",
+    contactWa: "6281234567890",
+    bride: { nickname:"Ayu", fullName:"Ayu Kirana Putri", childOrder:"Putri kedua", father:"Bapak Sutrisno", mother:"Ibu Wulandari", photo:"" },
+    groom: { nickname:"Bagas", fullName:"Bagas Ardiansyah", childOrder:"Putra pertama", father:"Bapak Hermawan", mother:"Ibu Ratnasari", photo:"" },
+    event: {
+      akadDate:"2026-11-14", akadTime:"09:00", akadVenue:"Kediaman Mempelai Wanita", akadAddr:"Jl. Melati No. 12, Yogyakarta",
+      resepsiDate:"2026-11-14", resepsiTime:"11:00", resepsiVenue:"Gedung Pendopo Wiratama", resepsiAddr:"Jl. Kaliurang KM 7, Sleman, Yogyakarta",
+      mapsUrl:"https://maps.google.com",
+    },
+    stories: [
+      { id:uid(), date:"2019", title:"Pertama Bertemu", text:"Dipertemukan di sebuah acara kampus, obrolan singkat itu berlanjut jadi kebiasaan bertukar kabar setiap hari." },
+    ],
+    gallery: [],
+    accounts: [ { id:uid(), bank:"BCA", number:"1234567890", name:"Ayu Kirana Putri" } ],
+    decorations: { petals: true },
+  };
+}
+
+let state = defaultData();
+let wishes = [ { id:uid(), name:"Sinta", attend:"Hadir", message:"Selamat menempuh hidup baru, bahagia selalu!" } ];
+let opened = false;
+let mode = "editor";     // editor | guest
+let countdownTimer = null;
+let saveTimer = null;
+let previewDebounce = null;
+
+/* ============================================================
+   HELPERS
+============================================================ */
+function setDeep(obj, pathArr, value) {
+  let ref = obj;
+  for (let i=0;i<pathArr.length-1;i++) ref = ref[pathArr[i]];
+  ref[pathArr[pathArr.length-1]] = value;
+}
+function getDeep(obj, pathArr) {
+  return pathArr.reduce((r,k)=> (r ? r[k] : undefined), obj);
+}
+function fmtLongDate(dateStr) {
+  if (!dateStr) return "";
+  try {
+    return new Date(dateStr+"T00:00:00").toLocaleDateString("id-ID", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  } catch { return dateStr; }
+}
+function fileToCompressedDataUrl(file, maxDim=900, quality=0.82) {
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let {width,height} = img;
+        if (width>maxDim || height>maxDim) {
+          const scale = maxDim/Math.max(width,height);
+          width = Math.round(width*scale); height = Math.round(height*scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width=width; canvas.height=height;
+        canvas.getContext("2d").drawImage(img,0,0,width,height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+function saveDraft() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try { localStorage.setItem("undangan_draft_v1", JSON.stringify(state)); setSaveStatus("Draf tersimpan"); }
+    catch { setSaveStatus("Gagal menyimpan draf"); }
+  }, 600);
+  setSaveStatus("Menyimpan...");
+}
+function setSaveStatus(t) { const el=document.getElementById("saveStatus"); if (el) el.textContent = t; }
+function scheduleRenderPreview() {
+  clearTimeout(previewDebounce);
+  previewDebounce = setTimeout(renderPreview, 120);
+}
+
+/* ============================================================
+   ICONS (tiny inline SVGs)
+============================================================ */
+const ICON = {
+  heart: c => `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.6"><path d="M12 21s-7.5-4.9-10-9.3C.4 8 2 4 6 4c2.2 0 3.7 1.2 6 4 2.3-2.8 3.8-4 6-4 4 0 5.6 4 4 7.7C19.5 16.1 12 21 12 21z"/></svg>`,
+  pin: c => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><path d="M12 22s8-7.3 8-13a8 8 0 1 0-16 0c0 5.7 8 13 8 13z"/><circle cx="12" cy="9" r="2.6"/></svg>`,
+  send: c => `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>`,
+  copy: c => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  check: c => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>`,
+  wa: c => `<svg width="13" height="13" viewBox="0 0 24 24" fill="${c}"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.6.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.1.2-.3.2-.4.1-.2 0-.4 0-.5-.1-.1-.6-1.5-.8-2-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s1 2.6 1.1 2.7c.1.2 2 3 4.8 4.2.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.1-.3-.2-.6-.3z"/><path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2z" fill="none" stroke="${c}" stroke-width="1.3"/></svg>`,
+};
+function flourishSvg(c) {
+  return `<svg viewBox="0 0 200 24" class="flourish"><path d="M0 12 H80" stroke="${c}" stroke-width="1" fill="none"/><path d="M120 12 H200" stroke="${c}" stroke-width="1" fill="none"/><path d="M100 12 c-6 -10 -20 -10 -20 0 c0 8 12 10 20 4 c8 6 20 4 20 -4 c0 -10 -14 -10 -20 0 Z" fill="none" stroke="${c}" stroke-width="1.1"/></svg>`;
+}
+function cornerVineSvg(c, flip) {
+  return `<svg viewBox="0 0 90 90" style="position:absolute;top:0;${flip?'right':'left'}:0;width:64px;height:64px;opacity:.7;${flip?'transform:scaleX(-1);':''}">
+    <path d="M2 2 C30 2 8 30 34 30 C54 30 40 55 64 55" fill="none" stroke="${c}" stroke-width="1.2"/>
+    <circle cx="34" cy="30" r="2.2" fill="${c}"/><circle cx="64" cy="55" r="1.8" fill="${c}"/><circle cx="16" cy="12" r="1.5" fill="${c}"/>
+  </svg>`;
+}
+function monogramSvg(initials, primary, accent) {
+  return `<svg viewBox="0 0 220 180" style="width:150px;height:120px;margin:0 auto;display:block;">
+    <path d="M20 170 V90 C20 40 60 15 110 15 C160 15 200 40 200 90 V170" fill="none" stroke="${accent}" stroke-width="1.4"/>
+    <path d="M8 170 V95" stroke="${accent}" stroke-width="1" opacity=".5"/><path d="M212 170 V95" stroke="${accent}" stroke-width="1" opacity=".5"/>
+    <text x="110" y="80" text-anchor="middle" font-family="'Alex Brush',cursive" font-size="42" fill="${primary}">${initials}</text>
+  </svg>`;
+}
+function petalsHtml(color) {
+  let out = '<div class="petal-layer">';
+  for (let i=0;i<14;i++) {
+    const left=(Math.random()*100).toFixed(1), dur=(8+Math.random()*7).toFixed(1), delay=(Math.random()*10).toFixed(1),
+      size=(8+Math.random()*9).toFixed(0), drift=Math.round((Math.random()-0.5)*70), spin=(Math.random()>0.5?180:-180);
+    out += `<span class="petal" style="left:${left}%;animation-duration:${dur}s;animation-delay:${delay}s;--drift:${drift}px;--spin:${spin}deg;">
+      <svg width="${size}" height="${size}" viewBox="0 0 20 20"><path d="M10 0 C15 4 15 11 10 16 C5 11 5 4 10 0 Z" fill="${color}" opacity=".6"/></svg></span>`;
+  }
+  return out + '</div>';
+}
+
+/* ============================================================
+   INVITATION CONTENT RENDERER (shared: editor preview + guest link)
+============================================================ */
+function invitationHtml(s, isOpened) {
+  const t = THEMES[s.theme];
+  const targetDate = `${s.event.resepsiDate||s.event.akadDate}T${s.event.resepsiTime||s.event.akadTime||'00:00'}`;
+  let html = `<div style="background:${t.bg};color:${t.ink};">`;
+
+  // COVER
+  html += `<section class="inv-cover" style="background:${isOpened?t.bg:t.primary};color:${isOpened?t.ink:'#FBF7EF'};">`;
+  if (s.decorations?.petals) html += petalsHtml(t.accent);
+  if (!isOpened) {
+    html += cornerVineSvg('#FBF7EF', false) + cornerVineSvg('#FBF7EF', true);
+    html += `<p class="inv-eyebrow">The Wedding Of</p>`;
+    html += monogramSvg(`${(s.bride.nickname[0]||'')}&${(s.groom.nickname[0]||'')}`, '#FBF7EF', t.accent);
+    html += `<h1 class="inv-names-script">${s.bride.nickname} &amp; ${s.groom.nickname}</h1>`;
+    html += `<p style="font-size:13px;margin-top:16px;opacity:.9;">Kepada Yth.</p>`;
+    html += `<p style="font-size:15px;font-weight:500;margin-top:2px;">${s.guestName}</p>`;
+    html += `<button id="openBtn" class="inv-openbtn" style="background:${t.accent};color:${t.primary};">${ICON.send('currentColor')} Buka Undangan</button>`;
+  } else {
+    html += cornerVineSvg(t.accent, false) + cornerVineSvg(t.accent, true);
+    html += `<p class="inv-eyebrow" style="color:${t.inkSoft};">${fmtLongDate(s.event.resepsiDate||s.event.akadDate)}</p>`;
+    html += `<h1 class="inv-names-script" style="color:${t.primary};">${s.bride.nickname} &amp; ${s.groom.nickname}</h1>`;
+    html += `<p style="margin-top:22px;font-size:13px;font-style:italic;line-height:1.6;color:${t.inkSoft};">&ldquo;${s.quote}&rdquo;</p>`;
+  }
+  html += `</section>`;
+
+  if (!isOpened) { html += `</div>`; return html; }
+
+  // MEMPELAI
+  html += `<section class="inv-sec" style="background:${t.surface};">
+    <h2 class="inv-h2" style="color:${t.primary};">Mempelai</h2>${flourishSvg(t.accent)}`;
+  [s.bride, s.groom].forEach(p=>{
+    html += p.photo
+      ? `<img class="couple-photo" style="border-color:${t.accent};margin-top:20px;" src="${p.photo}" alt="${p.fullName}">`
+      : `<div class="couple-photo-ph" style="border-color:${t.accent};background:${t.bg};margin-top:20px;">${ICON.heart(t.accent)}</div>`;
+    html += `<h3 class="font-display" style="font-size:20px;margin:0;color:${t.ink};">${p.fullName}</h3>
+      <p style="font-size:12px;margin-top:4px;color:${t.inkSoft};">${p.childOrder} dari ${p.father} &amp; ${p.mother}</p>`;
+  });
+  html += `</section>`;
+
+  // CERITA CINTA
+  if (s.stories.length) {
+    html += `<section class="inv-sec" style="background:${t.bg};">
+      <h2 class="inv-h2" style="color:${t.primary};">Cerita Cinta</h2>${flourishSvg(t.accent)}<div style="margin-top:18px;">`;
+    s.stories.forEach(st=>{
+      html += `<div class="story-item" style="border-color:${t.accent};">
+        <p style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:${t.accent};margin:0;">${st.date}</p>
+        <p style="font-size:13px;font-weight:500;margin:2px 0 0;color:${t.ink};">${st.title}</p>
+        <p style="font-size:12px;margin-top:4px;line-height:1.6;color:${t.inkSoft};">${st.text}</p></div>`;
+    });
+    html += `</div></section>`;
+  }
+
+  // ACARA + COUNTDOWN
+  html += `<section class="inv-sec" style="background:${t.surface};">
+    <h2 class="inv-h2" style="color:${t.primary};">Acara</h2>${flourishSvg(t.accent)}
+    <div class="cd-wrap" data-target="${targetDate}">
+      <div class="cd-box" style="background:${t.primary};"><div class="cd-num" id="cd-d">00</div><div class="cd-lbl">Hari</div></div>
+      <div class="cd-box" style="background:${t.primary};"><div class="cd-num" id="cd-h">00</div><div class="cd-lbl">Jam</div></div>
+      <div class="cd-box" style="background:${t.primary};"><div class="cd-num" id="cd-m">00</div><div class="cd-lbl">Menit</div></div>
+      <div class="cd-box" style="background:${t.primary};"><div class="cd-num" id="cd-s">00</div><div class="cd-lbl">Detik</div></div>
+    </div>`;
+  [
+    {title:"Akad Nikah", d:s.event.akadDate, tm:s.event.akadTime, v:s.event.akadVenue, a:s.event.akadAddr},
+    {title:"Resepsi", d:s.event.resepsiDate, tm:s.event.resepsiTime, v:s.event.resepsiVenue, a:s.event.resepsiAddr},
+  ].forEach(ev=>{
+    html += `<div class="ev-block">
+      <p style="font-size:13px;font-weight:500;margin:0;color:${t.ink};">${ev.title}</p>
+      <p style="font-size:12px;margin:4px 0 0;color:${t.inkSoft};">${fmtLongDate(ev.d)}</p>
+      <p style="font-size:12px;margin:0;color:${t.inkSoft};">Pukul ${ev.tm} WIB</p>
+      <p style="font-size:12px;margin:4px 0 0;font-weight:500;color:${t.ink};">${ev.v}</p>
+      <p style="font-size:12px;margin:0;color:${t.inkSoft};">${ev.a}</p></div>`;
+  });
+  if (s.event.mapsUrl) {
+    html += `<a class="maps-btn" href="${s.event.mapsUrl}" target="_blank" rel="noopener noreferrer" style="background:${t.accent};color:${t.primary};">${ICON.pin('currentColor')} Lihat Lokasi</a>`;
+  }
+  html += `</section>`;
+
+  // GALERI
+  const photos = s.gallery.filter(Boolean);
+  if (photos.length) {
+    html += `<section class="inv-sec" style="background:${t.bg};">
+      <h2 class="inv-h2" style="color:${t.primary};">Galeri</h2>${flourishSvg(t.accent)}<div class="gallery-grid">`;
+    photos.forEach(url=>{ html += `<img src="${url}" alt="Galeri">`; });
+    html += `</div></section>`;
+  }
+
+  // AMPLOP DIGITAL
+  const accs = s.accounts.filter(a=>a.number);
+  if (accs.length || s.contactWa) {
+    html += `<section class="inv-sec" style="background:${t.surface};">
+      <h2 class="inv-h2" style="color:${t.primary};">Amplop Digital</h2>${flourishSvg(t.accent)}
+      <p style="font-size:12px;margin:12px 0 18px;color:${t.inkSoft};">Doa restu Anda adalah hadiah terindah. Jika berkenan memberi tanda kasih, dapat melalui:</p>`;
+    accs.forEach(a=>{
+      html += `<div class="acc-card" style="border-color:${t.line};" data-account="${a.number}">
+        <div><p style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;margin:0;color:${t.accent};">${a.bank}</p>
+        <p style="font-size:14px;font-weight:500;margin:2px 0;color:${t.ink};">${a.number}</p>
+        <p style="font-size:11px;margin:0;color:${t.inkSoft};">a.n. ${a.name}</p></div>
+        <button class="copybtn copy-acc" style="background:${t.bg};" data-num="${a.number}">${ICON.copy(t.inkSoft)}</button></div>`;
+    });
+    html += `</section>`;
+  }
+
+  // UCAPAN & DOA
+  html += `<section class="inv-sec" style="background:${t.bg};">
+    <h2 class="inv-h2" style="color:${t.primary};">Ucapan &amp; Doa</h2>${flourishSvg(t.accent)}`;
+  if (s.contactWa) {
+    const waMsg = encodeURIComponent(`Assalamualaikum, saya ingin konfirmasi kehadiran di pernikahan ${s.bride.nickname} & ${s.groom.nickname}.`);
+    html += `<a class="wa-btn" href="https://wa.me/${s.contactWa}?text=${waMsg}" target="_blank" rel="noopener noreferrer" style="background:#25D366;color:#fff;">${ICON.wa('#fff')} Konfirmasi Kehadiran via WhatsApp</a>`;
+  }
+  html += `<form id="wishForm" class="wish-form" style="margin-top:18px;text-align:left;">
+      <input id="wishName" placeholder="Nama Anda" style="border-color:${t.line};background:${t.surface};">
+      <select id="wishAttend" style="border-color:${t.line};background:${t.surface};">
+        <option>Hadir</option><option>Tidak Hadir</option><option>Masih Ragu</option>
+      </select>
+      <textarea id="wishMsg" placeholder="Tulis ucapan dan doa..." style="border-color:${t.line};background:${t.surface};"></textarea>
+      <button type="submit" class="primarybtn" style="background:${t.primary};">Kirim Ucapan</button>
+    </form>
+    <div id="wishList" style="margin-top:18px;max-height:210px;overflow-y:auto;"></div>
+    <p style="font-size:10px;color:${t.inkSoft};margin-top:10px;">*Ucapan tersimpan sementara di perangkat ini saja.</p>
+  </section>`;
+
+  // FOOTER
+  html += `<section class="inv-sec footer-sec" style="background:${t.primary};color:#FBF7EF;">
+    ${ICON.heart('#FBF7EF')}
+    <p class="font-script" style="font-size:26px;margin:10px 0 0;">${s.bride.nickname} &amp; ${s.groom.nickname}</p>
+    <p style="font-size:11px;margin-top:10px;opacity:.8;">Merupakan suatu kehormatan dan kebahagiaan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir.</p>
+  </section>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function renderWishList(container) {
+  const t = THEMES[state.theme];
+  container.innerHTML = wishes.map(w=>`
+    <div class="wish-card" style="background:${t.surface};">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <p style="font-size:12px;font-weight:500;margin:0;color:${t.ink};">${w.name}</p>
+        <span style="font-size:9px;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:${t.bg};color:${t.inkSoft};">${w.attend}</span>
+      </div>
+      <p style="font-size:12px;margin:4px 0 0;color:${t.inkSoft};">${w.message}</p>
+    </div>`).join("");
+}
+
+function startCountdown(root) {
+  clearInterval(countdownTimer);
+  const wrap = root.querySelector(".cd-wrap");
+  if (!wrap) return;
+  const target = wrap.dataset.target;
+  const tick = () => {
+    const diff = +new Date(target) - Date.now();
+    const dEl=root.querySelector("#cd-d"), hEl=root.querySelector("#cd-h"), mEl=root.querySelector("#cd-m"), sEl=root.querySelector("#cd-s");
+    if (!dEl) { clearInterval(countdownTimer); return; }
+    if (isNaN(diff) || diff<=0) { dEl.textContent=hEl.textContent=mEl.textContent=sEl.textContent="00"; return; }
+    dEl.textContent = String(Math.floor(diff/86400000)).padStart(2,"0");
+    hEl.textContent = String(Math.floor((diff/3600000)%24)).padStart(2,"0");
+    mEl.textContent = String(Math.floor((diff/60000)%60)).padStart(2,"0");
+    sEl.textContent = String(Math.floor((diff/1000)%60)).padStart(2,"0");
+  };
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+function bindInvitationEvents(root) {
+  const openBtn = root.querySelector("#openBtn");
+  if (openBtn) openBtn.addEventListener("click", ()=>{ opened = true; renderPreview(); });
+  root.querySelectorAll(".copy-acc").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      try {
+        await navigator.clipboard.writeText(btn.dataset.num);
+        const t = THEMES[state.theme];
+        btn.innerHTML = ICON.check(t.primary);
+        setTimeout(()=>{ btn.innerHTML = ICON.copy(t.inkSoft); }, 1800);
+      } catch {}
+    });
+  });
+  const wishForm = root.querySelector("#wishForm");
+  if (wishForm) {
+    wishForm.addEventListener("submit", e=>{
+      e.preventDefault();
+      const name = root.querySelector("#wishName").value.trim();
+      const msg = root.querySelector("#wishMsg").value.trim();
+      const attend = root.querySelector("#wishAttend").value;
+      if (!name || !msg) return;
+      wishes.unshift({ id:uid(), name, attend, message:msg });
+      renderWishList(root.querySelector("#wishList"));
+      wishForm.reset();
+    });
+    renderWishList(root.querySelector("#wishList"));
+  }
+  startCountdown(root);
+}
+
+/* ============================================================
+   PREVIEW RENDER (editor mode = phone frame, guest mode = full page)
+============================================================ */
+function renderPreview() {
+  if (mode === "editor") {
+    const scrollBox = document.getElementById("phoneScroll");
+    const prevScroll = scrollBox.scrollTop;
+    scrollBox.innerHTML = invitationHtml(state, opened);
+    scrollBox.scrollTop = prevScroll;
+    bindInvitationEvents(scrollBox);
+  } else {
+    const guestScroll = document.getElementById("guestScroll");
+    guestScroll.innerHTML = invitationHtml(state, opened) +
+      `<p style="text-align:center;font-size:11px;color:#a8a29e;padding:14px;">Dibuat dengan pembuat undangan digital · <a href="${location.pathname}" style="text-decoration:underline;">Buat punya Anda</a></p>`;
+    bindInvitationEvents(guestScroll);
+  }
+}
+
+/* ============================================================
+   EDITOR SHELL
+============================================================ */
+function toggleSection(headEl) {
+  headEl.parentElement.classList.toggle("open");
+}
+
+function themeSwatches(t) {
+  return `<div class="swatches"><span class="swatch" style="background:${t.primary}"></span><span class="swatch" style="background:${t.accent}"></span><span class="swatch" style="background:${t.bg};border:1px solid #ddd;"></span></div>`;
+}
+
+function renderEditorShell() {
+  const pane = document.getElementById("editorPane");
+  pane.innerHTML = `
+    <p class="savestat" id="saveStatus"></p>
+
+    <div class="section open">
+      <div class="head" onclick="toggleSection(this)"><span>🎨 Tema &amp; Sampul</span><span class="chev">▾</span></div>
+      <div class="body">
+        <div class="themegrid" id="themeGrid"></div>
+        <div class="field" style="margin-top:10px;">
+          <span class="lbl">Nama tamu (untuk sampul)</span>
+          <input class="inp" data-path="guestName" value="${state.guestName}">
+        </div>
+        <label class="checkline">
+          <input type="checkbox" data-path="decorations.petals" ${state.decorations.petals?"checked":""}>
+          Animasi kelopak bunga melayang
+        </label>
+        <div class="field" style="margin-top:10px;">
+          <span class="lbl">Nomor WhatsApp konfirmasi (format 62...)</span>
+          <input class="inp" data-path="contactWa" value="${state.contactWa}">
+        </div>
+      </div>
+    </div>
+
+    <div class="section open">
+      <div class="head" onclick="toggleSection(this)"><span>💕 Mempelai</span><span class="chev">▾</span></div>
+      <div class="body">
+        ${["bride","groom"].map(who=>`
+          <p style="font-size:12px;font-weight:600;margin:10px 0 6px;">${who==="bride"?"Mempelai Wanita":"Mempelai Pria"}</p>
+          <div class="field"><span class="lbl">Nama panggilan</span><input class="inp" data-path="${who}.nickname" value="${state[who].nickname}"></div>
+          <div class="field"><span class="lbl">Nama lengkap</span><input class="inp" data-path="${who}.fullName" value="${state[who].fullName}"></div>
+          <div class="field"><span class="lbl">Anak ke-</span><input class="inp" data-path="${who}.childOrder" value="${state[who].childOrder}"></div>
+          <div class="field"><span class="lbl">Nama ayah</span><input class="inp" data-path="${who}.father" value="${state[who].father}"></div>
+          <div class="field"><span class="lbl">Nama ibu</span><input class="inp" data-path="${who}.mother" value="${state[who].mother}"></div>
+          <div class="field"><span class="lbl">Foto</span>
+            <div class="uploadrow">
+              <input class="inp" data-path="${who}.photo" placeholder="Tempel link, atau unggah dari HP" value="${state[who].photo}">
+              <button type="button" class="uploadbtn" data-upload="${who}">Unggah</button>
+              <input type="file" accept="image/*" data-upload-input="${who}" style="display:none;">
+            </div>
+            ${state[who].photo ? `<img class="thumb" id="thumb-${who}" src="${state[who].photo}">` : `<img class="thumb" id="thumb-${who}" style="display:none;">`}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="head" onclick="toggleSection(this)"><span>📅 Acara &amp; Lokasi</span><span class="chev">▾</span></div>
+      <div class="body">
+        <p style="font-size:12px;font-weight:600;margin:0 0 6px;">Akad Nikah</p>
+        <div class="row2">
+          <div class="field"><span class="lbl">Tanggal</span><input class="inp" type="date" data-path="event.akadDate" value="${state.event.akadDate}"></div>
+          <div class="field"><span class="lbl">Waktu</span><input class="inp" type="time" data-path="event.akadTime" value="${state.event.akadTime}"></div>
+        </div>
+        <div class="field"><span class="lbl">Tempat</span><input class="inp" data-path="event.akadVenue" value="${state.event.akadVenue}"></div>
+        <div class="field"><span class="lbl">Alamat</span><textarea class="inp" data-path="event.akadAddr">${state.event.akadAddr}</textarea></div>
+
+        <p style="font-size:12px;font-weight:600;margin:14px 0 6px;">Resepsi</p>
+        <div class="row2">
+          <div class="field"><span class="lbl">Tanggal</span><input class="inp" type="date" data-path="event.resepsiDate" value="${state.event.resepsiDate}"></div>
+          <div class="field"><span class="lbl">Waktu</span><input class="inp" type="time" data-path="event.resepsiTime" value="${state.event.resepsiTime}"></div>
+        </div>
+        <div class="field"><span class="lbl">Tempat</span><input class="inp" data-path="event.resepsiVenue" value="${state.event.resepsiVenue}"></div>
+        <div class="field"><span class="lbl">Alamat</span><textarea class="inp" data-path="event.resepsiAddr">${state.event.resepsiAddr}</textarea></div>
+        <div class="field"><span class="lbl">Tautan Google Maps</span><input class="inp" data-path="event.mapsUrl" value="${state.event.mapsUrl}"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="head" onclick="toggleSection(this)"><span>📖 Cerita Cinta</span><span class="chev">▾</span></div>
+      <div class="body">
+        <div id="storiesList"></div>
+        <button type="button" class="dashedbtn" data-add="stories">+ Tambah momen</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="head" onclick="toggleSection(this)"><span>🖼 Galeri Foto</span><span class="chev">▾</span></div>
+      <div class="body">
+        <div id="galleryList"></div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="dashedbtn" data-add="gallery">+ Tambah slot</button>
+          <button type="button" class="dashedbtn" id="galleryMultiBtn">+ Unggah beberapa</button>
+        </div>
+        <input type="file" accept="image/*" multiple id="galleryMultiInput" style="display:none;">
+        <p class="hint">Foto otomatis dikecilkan agar draf tetap ringan.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="head" onclick="toggleSection(this)"><span>🎁 Amplop Digital</span><span class="chev">▾</span></div>
+      <div class="body">
+        <div id="accountsList"></div>
+        <button type="button" class="dashedbtn" data-add="accounts">+ Tambah rekening</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="head" onclick="toggleSection(this)"><span>💬 Kutipan Pembuka</span><span class="chev">▾</span></div>
+      <div class="body">
+        <textarea class="inp" data-path="quote">${state.quote}</textarea>
+      </div>
+    </div>
+
+    <div class="section open">
+      <div class="head" onclick="toggleSection(this)"><span>🔗 Bagikan</span><span class="chev">▾</span></div>
+      <div class="body">
+        <button class="primarybtn" id="genLinkBtn">Buat Tautan Undangan</button>
+        <div id="linkOut"></div>
+      </div>
+    </div>
+  `;
+  renderThemeGrid();
+  renderStoriesList();
+  renderGalleryList();
+  renderAccountsList();
+  bindEditorDelegation();
+}
+
+function renderThemeGrid() {
+  const grid = document.getElementById("themeGrid");
+  grid.innerHTML = Object.entries(THEMES).map(([key,t])=>`
+    <button type="button" class="themecard ${state.theme===key?"active":""}" data-theme="${key}">
+      ${themeSwatches(t)}<span style="font-size:11px;color:#57534b;">${t.label}</span>
+    </button>`).join("");
+}
+
+function renderStoriesList() {
+  document.getElementById("storiesList").innerHTML = state.stories.map(s=>`
+    <div class="listitem">
+      <button class="rm" data-remove="stories" data-id="${s.id}">✕</button>
+      <div class="field"><span class="lbl">Tahun</span><input class="inp" data-list="stories" data-id="${s.id}" data-field="date" value="${s.date}"></div>
+      <div class="field"><span class="lbl">Judul</span><input class="inp" data-list="stories" data-id="${s.id}" data-field="title" value="${s.title}"></div>
+      <div class="field"><span class="lbl">Cerita</span><textarea class="inp" data-list="stories" data-id="${s.id}" data-field="text">${s.text}</textarea></div>
+    </div>`).join("");
+}
+function renderGalleryList() {
+  document.getElementById("galleryList").innerHTML = state.gallery.map((url,i)=>`
+    <div class="listitem" style="display:flex;gap:6px;align-items:flex-start;">
+      <div style="flex:1;">
+        <div class="uploadrow">
+          <input class="inp" data-list="gallery" data-idx="${i}" placeholder="Tempel link, atau unggah dari HP" value="${url}">
+          <button type="button" class="uploadbtn" data-upload-gallery="${i}">Unggah</button>
+          <input type="file" accept="image/*" data-upload-gallery-input="${i}" style="display:none;">
+        </div>
+        ${url ? `<img class="thumb" src="${url}">` : ""}
+      </div>
+      <button class="rm" style="position:static;" data-remove-idx="gallery" data-idx="${i}">✕</button>
+    </div>`).join("");
+}
+function renderAccountsList() {
+  document.getElementById("accountsList").innerHTML = state.accounts.map(a=>`
+    <div class="listitem">
+      <button class="rm" data-remove="accounts" data-id="${a.id}">✕</button>
+      <div class="field"><span class="lbl">Bank / e-wallet</span><input class="inp" data-list="accounts" data-id="${a.id}" data-field="bank" value="${a.bank}"></div>
+      <div class="field"><span class="lbl">Nomor rekening</span><input class="inp" data-list="accounts" data-id="${a.id}" data-field="number" value="${a.number}"></div>
+      <div class="field"><span class="lbl">Atas nama</span><input class="inp" data-list="accounts" data-id="${a.id}" data-field="name" value="${a.name}"></div>
+    </div>`).join("");
+}
+
+/* ---- delegated events on the whole editor pane ---- */
+function bindEditorDelegation() {
+  const pane = document.getElementById("editorPane");
+
+  pane.addEventListener("input", e=>{
+    const t = e.target;
+    if (t.dataset.path) {
+      const val = t.type==="checkbox" ? t.checked : t.value;
+      setDeep(state, t.dataset.path.split("."), val);
+      scheduleRenderPreview(); saveDraft();
+    } else if (t.dataset.list && t.dataset.field) {
+      const arr = state[t.dataset.list];
+      const item = arr.find(x=>x.id===t.dataset.id);
+      if (item) { item[t.dataset.field] = t.value; scheduleRenderPreview(); saveDraft(); }
+    } else if (t.dataset.list === "gallery" && t.dataset.idx !== undefined) {
+      state.gallery[+t.dataset.idx] = t.value;
+      scheduleRenderPreview(); saveDraft();
+    }
+  });
+
+  pane.addEventListener("change", e=>{
+    const t = e.target;
+    if (t.dataset.path && t.type==="checkbox") {
+      setDeep(state, t.dataset.path.split("."), t.checked);
+      scheduleRenderPreview(); saveDraft();
+    }
+  });
+
+  pane.addEventListener("click", async e=>{
+    const t = e.target.closest("[data-add],[data-remove],[data-remove-idx],[data-theme],[data-upload],[data-upload-gallery]");
+    if (!t) return;
+
+    if (t.dataset.add === "stories") { state.stories.push({id:uid(),date:"",title:"",text:""}); renderStoriesList(); scheduleRenderPreview(); saveDraft(); }
+    if (t.dataset.add === "gallery") { state.gallery.push(""); renderGalleryList(); scheduleRenderPreview(); saveDraft(); }
+    if (t.dataset.add === "accounts") { state.accounts.push({id:uid(),bank:"",number:"",name:""}); renderAccountsList(); scheduleRenderPreview(); saveDraft(); }
+
+    if (t.dataset.remove) {
+      state[t.dataset.remove] = state[t.dataset.remove].filter(x=>x.id!==t.dataset.id);
+      if (t.dataset.remove==="stories") renderStoriesList();
+      if (t.dataset.remove==="accounts") renderAccountsList();
+      scheduleRenderPreview(); saveDraft();
+    }
+    if (t.dataset.removeIdx === "gallery") {
+      state.gallery.splice(+t.dataset.idx, 1);
+      renderGalleryList(); scheduleRenderPreview(); saveDraft();
+    }
+    if (t.dataset.theme) { state.theme = t.dataset.theme; renderThemeGrid(); scheduleRenderPreview(); saveDraft(); }
+
+    if (t.dataset.upload) {
+      const who = t.dataset.upload;
+      const input = pane.querySelector(`[data-upload-input="${who}"]`);
+      input.onchange = async () => {
+        const file = input.files[0]; if (!file) return;
+        const url = await fileToCompressedDataUrl(file);
+        state[who].photo = url;
+        const thumb = document.getElementById(`thumb-${who}`);
+        thumb.src = url; thumb.style.display = "block";
+        pane.querySelector(`[data-path="${who}.photo"]`).value = url;
+        scheduleRenderPreview(); saveDraft();
+        input.value = "";
+      };
+      input.click();
+    }
+    if (t.dataset.uploadGallery !== undefined) {
+      const idx = +t.dataset.uploadGallery;
+      const input = pane.querySelector(`[data-upload-gallery-input="${idx}"]`);
+      input.onchange = async () => {
+        const file = input.files[0]; if (!file) return;
+        state.gallery[idx] = await fileToCompressedDataUrl(file);
+        renderGalleryList(); scheduleRenderPreview(); saveDraft();
+        input.value = "";
+      };
+      input.click();
+    }
+  });
+
+  document.getElementById("galleryMultiBtn").addEventListener("click", ()=> document.getElementById("galleryMultiInput").click());
+  document.getElementById("galleryMultiInput").addEventListener("change", async e=>{
+    const files = Array.from(e.target.files||[]);
+    const urls = await Promise.all(files.map(f=>fileToCompressedDataUrl(f)));
+    state.gallery.push(...urls);
+    renderGalleryList(); scheduleRenderPreview(); saveDraft();
+    e.target.value = "";
+  });
+
+  document.getElementById("genLinkBtn").addEventListener("click", generateLink);
+}
+
+/* ============================================================
+   SHAREABLE LINK
+============================================================ */
+function generateLink() {
+  const json = JSON.stringify(state);
+  const compressed = LZString.compressToEncodedURIComponent(json);
+  const url = `${location.origin}${location.pathname}#u=${compressed}`;
+  const out = document.getElementById("linkOut");
+  const big = url.length > 6000;
+  out.innerHTML = `
+    <div class="linkbox">
+      <input class="inp" id="linkField" readonly value="${url}">
+      <button type="button" class="uploadbtn" id="copyLinkBtn">Salin</button>
+    </div>
+    ${big ? `<p class="warn">⚠️ Tautan cukup panjang (kemungkinan karena foto yang diunggah). Jika susah dibagikan lewat WhatsApp/SMS, ganti foto dengan link (URL) dari Google Drive/Imgur, atau kurangi jumlah foto.</p>`
+          : `<p class="hint">Tautan siap dibagikan. Membukanya akan langsung menampilkan undangan ini.</p>`}
+  `;
+  document.getElementById("copyLinkBtn").addEventListener("click", async ()=>{
+    try { await navigator.clipboard.writeText(url); document.getElementById("copyLinkBtn").textContent = "Tersalin ✓"; setTimeout(()=>{ document.getElementById("copyLinkBtn").textContent="Salin"; },1800); } catch {}
+  });
+}
+
+/* ============================================================
+   MODE SWITCH / INIT
+============================================================ */
+function switchTab(tab) {
+  document.getElementById("editorPane").classList.toggle("show", tab==="editor");
+  document.getElementById("previewPane").classList.toggle("show", tab==="preview");
+  document.getElementById("tabEditor").classList.toggle("active", tab==="editor");
+  document.getElementById("tabPreview").classList.toggle("active", tab==="preview");
+}
+
+function initGuestView() {
+  document.getElementById("topbar").style.display = "none";
+  document.getElementById("layout").style.display = "none";
+  const root = document.getElementById("guestRoot");
+  root.style.display = "block";
+  root.innerHTML = `<div id="guestWrap"><div id="guestScroll"></div></div>`;
+  mode = "guest";
+  renderPreview();
+}
+
+function initEditor() {
+  try {
+    const saved = localStorage.getItem("undangan_draft_v1");
+    if (saved) state = { ...defaultData(), ...JSON.parse(saved), decorations: { ...defaultData().decorations, ...(JSON.parse(saved).decorations||{}) } };
+  } catch {}
+  renderEditorShell();
+  renderPreview();
+  if (window.innerWidth <= 900) switchTab("editor");
+}
+
+(function boot(){
+  const hash = location.hash;
+  if (hash.startsWith("#u=")) {
+    try {
+      const json = LZString.decompressFromEncodedURIComponent(hash.slice(3));
+      const parsed = JSON.parse(json);
+      state = { ...defaultData(), ...parsed, decorations: { ...defaultData().decorations, ...(parsed.decorations||{}) } };
+      initGuestView();
+      return;
+    } catch (e) {
+      console.error("Gagal memuat undangan dari tautan:", e);
+    }
+  }
+  initEditor();
+})();
+</script>
+</body>
+</html>
